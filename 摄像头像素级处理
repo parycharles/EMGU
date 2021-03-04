@@ -1,0 +1,2065 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using System.Collections;
+using System.Runtime.InteropServices;
+ //===========调用的Emgu dll============
+using Emgu.CV;  
+using Emgu.CV.Structure;
+using Emgu.Util;
+using System.Threading;
+
+namespace xx
+{
+    public partial class Form1 : Form
+    {
+        private Capture capture;
+        private bool captureinprocess;   //判断摄像头的状态        
+        Image<Bgr, Byte> frame;
+        private long m = 0;
+        Dictionary<long, long> d0;
+        Dictionary<long, long> d1;
+        Dictionary<long, long> d2;
+        int rows; int cols; //rows=height,cols=width
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void processfram(object sender, EventArgs arg)
+        {
+            //获取摄像头的视频帧:
+            frame = capture.QueryFrame();
+            imageBox1.Image = frame;
+
+            rows = frame.Rows;
+            cols = frame.Cols;
+
+
+            //Image<Bgr, Byte> frame = capture.QueryFrame();//获取摄像头的视频帧
+            //Image<Bgr, Byte> frame2 = frame.Convert<Bgr, Byte>(); //将帧转换为RGB类型，对应为三维数组
+            //Image<Gray, Byte> grayFrame = frame.Convert<Gray, Byte>();//将帧转换为Gray类型，对应为一维数组
+            //Image<Ycc, Byte> currentYCrCbFrame = frame.Convert<Ycc, Byte>();//将帧转换为YCbCr类型，对应为三维数组
+            //Image<Gray, Byte> skin = new Image<Gray, Byte>(frame.Width, frame.Height);//构建灰度区域对象
+
+
+
+
+
+
+        }
+
+
+
+        //反色抓拍：
+        private void button2_Click(object sender, EventArgs e)
+        {
+            //========反色处理==========
+            Image<Bgr, Byte> img3 = frame.Convert<byte>(delegate(Byte b) { return (Byte)(255 - b); });
+            this.pictureBox1.Image = img3.ToBitmap();
+            //==============
+        }
+
+        //画面加图：
+        private void button3_Click(object sender, EventArgs e)
+        {   
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>();
+            byte[, ,] d = f2.Data;
+
+            //黑色区域加许多白色圆圈：
+            Gray c0 = new Gray(255);
+            for (int y = 10; y < rows-10;y+=10 )
+            {
+                for (int x = 10; x < cols-10; x+=10)
+                {
+                    byte b=d[y,x,0];
+                    PointF pf = new PointF(x, y);
+                    if (b < 128) f2.Draw(new CircleF(pf, 5), c0, 1);
+                }
+            }
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //取出点之像素:
+        private void button4_Click(object sender, EventArgs e)
+        {
+            //在圆心处取出像素的RGB：
+            cols = frame.Width;
+            rows = frame.Height;
+
+            //将帧转换为BGR类型，对应为三维数组:
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+
+            //标题栏输出中心点颜色：
+            string ss = f2[rows / 2, cols / 2].Red + "," + f2[rows / 2, cols / 2].Green + "," + f2[rows / 2, cols / 2].Blue;
+            this.Text = ss;
+
+            //中心坐标：
+            PointF pf = new PointF(cols / 2 - 10, rows / 2 - 10);
+            Bgr c0 = new Bgr(0, 0, 255);
+            //画圆与十字线：
+            f2.Draw(new CircleF(pf, 20), c0, 1);
+            f2.Draw(new Cross2DF(pf, 20, 20), c0, 1);
+
+            //图片框重绘：
+            this.pictureBox1.Image = f2.ToBitmap();
+            //MessageBox.Show(c0);
+
+        }
+
+        //灰度照片
+        private void button5_Click(object sender, EventArgs e)
+        {
+            //Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>() ;//构建BGR区域对象            
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>(); ;//构建灰度区域对象       
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //二值化图像:
+        private void button6_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+
+                    if (b < 110) //阀值
+                    {
+                        bgrData[i, j, 0] = (byte)0;
+                        bgrData[i, j, 1] = (byte)0;
+                        bgrData[i, j, 2] = (byte)0;
+                    }
+                    else      //二值化:
+                    {
+                        bgrData[i, j, 0] = (byte)255;
+                        bgrData[i, j, 1] = (byte)255;
+                        bgrData[i, j, 2] = (byte)255;
+                    }
+                }
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //水平翻转：
+        private void button7_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.Image = f2.Flip(Emgu.CV.CvEnum.FLIP.HORIZONTAL).ToBitmap();
+        }
+
+        //垂直翻转：
+        private void button8_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.Image = f2.Flip(Emgu.CV.CvEnum.FLIP.VERTICAL).ToBitmap();
+        }
+
+        //保存视频为图片文件:
+        private void button9_Click(object sender, EventArgs e)
+        {
+            CvInvoke.cvSaveImage("../../1.jpg", frame);
+            MessageBox.Show("文件已经保存： ../../1.jpg");
+        }
+
+        //摄像头控制：
+        private void button1_Click_1(object sender, EventArgs e)
+        {
+            if (capture != null)//摄像头不为空
+            {
+                if (captureinprocess)
+                {
+                    Application.Idle -= new EventHandler(processfram);
+                    this.Text = "摄像头已经停止";
+                    button1.Text = "开始摄像";
+                }
+                else
+                {
+                    Application.Idle += new EventHandler(processfram);
+                    this.Text = "摄像头已经启动";
+                    button1.Text = "停止摄像";
+
+                }
+                captureinprocess = !captureinprocess;
+            }
+            else    //摄像头为空则通过Capture()方法调用
+            {
+                try
+                {
+                    capture = new Capture();
+                }
+                catch (NullReferenceException excpt)
+                {
+                    MessageBox.Show(excpt.Message);
+                }
+            }
+        }
+
+        //窗体加载：
+        private void Form1_Load_1(object sender, EventArgs e)
+        {
+            //建立字典对象：
+            d0 = new Dictionary<long, long>();
+            d1 = new Dictionary<long, long>();
+            d2 = new Dictionary<long, long>();
+
+            if (capture != null)//摄像头不为空
+            {
+                if (captureinprocess)
+                {
+                    Application.Idle -= new EventHandler(processfram);
+                    this.Text = "摄像头已经停止";
+                    button1.Text = "开始摄像";
+                }
+                else
+                {
+                    Application.Idle += new EventHandler(processfram);
+                    this.Text = "摄像头已经启动";
+                    button1.Text = "停止摄像";
+                }
+                captureinprocess = !captureinprocess;
+            }
+            else    //摄像头为空则通过Capture()方法调用
+            {
+                try
+                {
+                    capture = new Capture();
+                }
+                catch (NullReferenceException excpt)
+                {
+                    MessageBox.Show(excpt.Message);
+                }
+            }
+        }
+
+        private void button10_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //转换后，在pictureBox1上显示二值化图像:
+            //int r = 0;
+            //int g = 0;
+            int b = 0;
+            rows = frame.Rows;
+            cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            // d*d 区块平滑化：
+            //int d = 5;
+            //byte[,] v = new byte[rows, cols]; int tmp = 0;
+            //for (int i = 0; i < rows-d; i+=d)
+            //    for (int j = 0; j < cols-d; j+=d)
+            //    {
+            //        //计算均值：
+            //        for (int x = 0; x < d+1; x ++)
+            //        {
+            //            for (int y = 0; y <d+1; y ++)
+            //            {
+            //              tmp+= bgrData[i+x, j+y, 0];
+            //            }
+            //        }
+            //        //写入均值：
+            //        for (int x = 0; x < d+1; x++)
+            //        {
+            //            for (int y = 0; y < d+1; y++)
+            //            {
+            //                v[i + x, j + y] = (byte)(tmp / d/d);
+            //            }
+            //        }                    
+            //        tmp = 0; //临时值清零
+            //    }
+
+            //区域平滑后，二值化：
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    //b = v[i , j ];
+                    b = bgrData[i, j, 0];
+                    if (b < 110) //阀值
+                    {
+                        bgrData[i, j, 0] = (byte)0;
+                        bgrData[i, j, 1] = (byte)0;
+                        bgrData[i, j, 2] = (byte)0;
+                    }
+                    else      //二值化:
+                    {
+                        bgrData[i, j, 0] = (byte)255;
+                        bgrData[i, j, 1] = (byte)255;
+                        bgrData[i, j, 2] = (byte)255;
+                    }
+                }
+
+
+            d0.Clear();
+            //二值化之后，异或运算边界化：
+            for (int i = 0; i < rows - 1; i++)
+                for (int j = 0; j < cols - 1; j++)
+                {
+                    int b1 = bgrData[i + 1, j, 0];
+                    int b2 = bgrData[i, j + 1, 0];
+                    b = bgrData[i, j, 0];
+                    int bb = (b ^ b1) | (b ^ b2);  //异或运算
+                    bgrData[i, j, 0] = (byte)bb;
+                    bgrData[i, j, 1] = (byte)bb;
+                    bgrData[i, j, 2] = (byte)bb;
+                    //白色点加入到字典：
+                    if (bb == 255) d0.Add(i * cols + j, 0); //i:行，j:列
+                }
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //边界矢量化：
+        private void button11_Click(object sender, EventArgs e)
+        {
+            //MessageBox.Show("当前字典0含有点："+d0.Count.ToString());
+
+            //给定起始点,调用搜索函数：
+            int x = 10;  //j
+            int y = 10;  //i
+            d1.Clear();
+            //refind1(x,y);  //很慢
+            //refind2(x, y); //很快,m由点的顺序而定;
+            refind3(x, y); //很快,m由距离大小递增;
+
+            //画矢量线：
+            //MessageBox.Show("当前字典1含有点：" + d1.Count.ToString());
+            Graphics g = this.pictureBox1.CreateGraphics();
+            //long ci = 0;// = d1[z];
+            Random rd = new Random();
+            byte rr = (byte)rd.Next(0, 255);
+            byte gg = (byte)rd.Next(0, 255);
+            byte bb = (byte)rd.Next(0, 255);
+            foreach (long z in d1.Keys)
+            {
+                int xi = (int)z % cols;
+                int yi = (int)z / cols;
+                //long ci=0;// = d1[z];
+
+                int ds = (xi - x) * (xi - x) + (yi - y) * (yi - y);
+                if (ds <= 25)
+                {
+                    Pen pen = new Pen(Color.FromArgb(rr, gg, bb), 2);
+                    Point p1 = new Point(x, y);
+                    Point p2 = new Point(xi, yi);
+                    g.DrawLine(pen, p1, p2);
+                }
+                if (ds > 1600)
+                {
+                    rr = (byte)rd.Next(0, 255);
+                    gg = (byte)rd.Next(0, 255);
+                    bb = (byte)rd.Next(0, 255);
+                }
+                x = xi; y = yi;
+            }
+            this.Text = "当前字典含有点：" + d1.Count.ToString() + ", 头：绿色，尾：粉色";
+        }
+
+        //保存右图：
+        private void button12_Click(object sender, EventArgs e)
+        {
+            this.pictureBox1.Image.Save("../../2.jpg");
+            MessageBox.Show("文件已经保存： ../../2.jpg");
+        }
+
+        //3x3梯度：
+        private void button13_Click(object sender, EventArgs e)
+        {
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.BackColor = Color.FromArgb(255, 255, 255);
+
+            this.pictureBox1.Refresh();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //灰度化：
+                    bgrData[i, j, 0] = (byte)((r + g + b) / 3);
+                }
+            //四点式梯度,十字形：
+            for (int i = 1; i < rows - 1; i++)
+            {
+                for (int j = 1; j < cols - 1; j++)
+                {
+                    byte bt = bgrData[i, j - 1, 0];
+                    byte bm = bgrData[i, j + 1, 0];
+                    byte bl = bgrData[i - 1, j, 0];
+                    byte br = bgrData[i + 1, j, 0];
+                    if (Math.Abs(bl - br) > 63 || Math.Abs(bt - bm) > 63)
+                    {
+                        Pen pen = new Pen(Color.FromArgb(0, 0, 100), 1);
+                        gc.DrawEllipse(pen, j, i, 1, 1);
+                    }
+                }
+            }
+            //this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //
+        private void button14_Click(object sender, EventArgs e)
+        {
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.BackColor = Color.FromArgb(255, 255, 255);
+
+            this.pictureBox1.Refresh();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //灰度化：
+                    bgrData[i, j, 0] = (byte)((r + g + b) / 3);
+                }
+            //四点式梯度,X形,提取角点：
+            for (int i = 2; i < rows - 2; i++)
+            {
+                for (int j = 2; j < cols - 2; j++)
+                {
+                    byte bt = bgrData[i - 2, j - 2, 0];
+                    byte bm = bgrData[i + 2, j + 2, 0];
+                    byte bl = bgrData[i - 2, j + 2, 0];
+                    byte br = bgrData[i + 2, j - 2, 0];
+                    if (Math.Abs(bl - br) > 63 & Math.Abs(bt - bm) > 63)
+                    {
+                        Pen pen = new Pen(Color.FromArgb(0, 120, 0), 1);
+                        gc.DrawEllipse(pen, j, i, 1, 1);
+                    }
+                }
+            }
+            //this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //框出文字：
+        private void button15_Click(object sender, EventArgs e)
+        {
+            //this.pictureBox1.Image = frame.ToBitmap();
+
+            Image<Bgr, Byte> simage = frame.Convert<Bgr, Byte>();     //new Image<Bgr, byte>("license-plate.jpg");
+            //Image<Bgr, Byte> simage = sizeimage.Resize(400, 300, Emgu.CV.CvEnum.INTER.CV_INTER_NN);
+            Image<Gray, Byte> GrayImg = new Image<Gray, Byte>(simage.Width, simage.Height);
+            IntPtr GrayImg1 = CvInvoke.cvCreateImage(simage.Size, Emgu.CV.CvEnum.IPL_DEPTH.IPL_DEPTH_8U, 1);
+            //灰度化
+            CvInvoke.cvCvtColor(simage.Ptr, GrayImg1, Emgu.CV.CvEnum.COLOR_CONVERSION.CV_BGR2GRAY);
+            //首先创建一张16深度有符号的图像区域
+            IntPtr Sobel = CvInvoke.cvCreateImage(simage.Size, Emgu.CV.CvEnum.IPL_DEPTH.IPL_DEPTH_16S, 1);
+            //X方向的Sobel算子检测
+            CvInvoke.cvSobel(GrayImg1, Sobel, 2, 0, 3);
+            IntPtr temp = CvInvoke.cvCreateImage(simage.Size, Emgu.CV.CvEnum.IPL_DEPTH.IPL_DEPTH_8U, 1);
+            CvInvoke.cvConvertScale(Sobel, temp, 0.00390625, 0);
+            ////int it = ComputeThresholdValue(GrayImg.ToBitmap());
+            ////二值化处理
+            ////Image<Gray, Byte> dest = GrayImg.ThresholdBinary(new Gray(it), new Gray(255));
+            Image<Gray, Byte> dest = new Image<Gray, Byte>(simage.Width, simage.Height);
+            //二值化处理
+            CvInvoke.cvThreshold(temp, dest, 0, 255, Emgu.CV.CvEnum.THRESH.CV_THRESH_OTSU);
+            IntPtr temp1 = CvInvoke.cvCreateImage(simage.Size, Emgu.CV.CvEnum.IPL_DEPTH.IPL_DEPTH_8U, 1);
+            Image<Gray, Byte> dest1 = new Image<Gray, Byte>(simage.Width, simage.Height);
+            CvInvoke.cvCreateStructuringElementEx(3, 1, 1, 0, Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, temp1);
+            CvInvoke.cvDilate(dest, dest1, temp1, 6);
+            CvInvoke.cvErode(dest1, dest1, temp1, 7);
+            CvInvoke.cvDilate(dest1, dest1, temp1, 1);
+            CvInvoke.cvCreateStructuringElementEx(1, 3, 0, 1, Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, temp1);
+            CvInvoke.cvErode(dest1, dest1, temp1, 2);
+            CvInvoke.cvDilate(dest1, dest1, temp1, 2);
+            IntPtr dst = CvInvoke.cvCreateImage(simage.Size, Emgu.CV.CvEnum.IPL_DEPTH.IPL_DEPTH_8U, 3);
+            CvInvoke.cvZero(dst);
+            //dest.Dilate(10);
+            //dest.Erode(5);
+            using (MemStorage stor = new MemStorage())
+            {
+                Contour<Point> contours = dest1.FindContours(
+                    Emgu.CV.CvEnum.CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE,
+                    Emgu.CV.CvEnum.RETR_TYPE.CV_RETR_CCOMP,
+                    stor);
+                for (; contours != null; contours = contours.HNext)
+                {
+
+                    Rectangle box = contours.BoundingRectangle;
+                    Image<Bgr, Byte> test = simage.CopyBlank();
+                    test.SetValue(255.0);
+                    double whRatio = (double)box.Width / box.Height;
+                    int area = (int)box.Width * box.Height;
+                    if (area > 1000 && area < 10000)
+                    {
+                        if ((3.0 < whRatio && whRatio < 6.0))
+                        {
+                            test.Draw(box, new Bgr(Color.Red), 2);
+                            simage.Draw(box, new Bgr(Color.Red), 2);//CvInvoke.cvNamedWindow("dst");
+                            //CvInvoke.cvShowImage("dst", dst);
+                            //imageBox1.Image = simage;
+                            // this.pictureBox1.Image = simage.ToBitmap();
+                        }
+                        this.pictureBox1.Image = simage.ToBitmap();
+                    }
+                }
+            }
+        }
+
+        //============================= 
+        //回字膨胀算法搜索临近点(很快)：
+        private void refind3(int x0, int y0)
+        {
+            int r = 1;
+            while (d0.Count > 0)
+            {
+                if (d1.ContainsKey(y0 * cols + x0)) d0.Remove(y0 * cols + x0);
+                //left --> right:                
+                for (int x = x0 - r; x <= x0 + r; x += 5)
+                {
+                    int y1 = y0 - r;
+                    int y2 = y0 + r;
+                    if (d0.ContainsKey(y1 * cols + x))
+                    {
+                        x0 = x; y0 = y1;
+                        if (!d1.ContainsKey(y1 * cols + x)) d1.Add(y1 * cols + x, m);
+                        r = 1; break;
+                    }
+                    if (d0.ContainsKey(y2 * cols + x))
+                    {
+                        x0 = x; y0 = y2;
+                        if (!d1.ContainsKey(y2 * cols + x)) d1.Add(y2 * cols + x, m);
+                        r = 1; break;
+                    }
+                }
+                //top to btm:
+                for (int y = y0 - r; y <= y0 + r; y += 5)
+                {
+                    int x1 = x0 - r;
+                    int x2 = x0 + r;
+                    if (d0.ContainsKey(y * cols + x1))
+                    {
+                        x0 = x1; y0 = y;
+                        if (!d1.ContainsKey(y * cols + x1)) d1.Add(y * cols + x1, m);
+                        r = 1; break;
+                    }
+                    if (d0.ContainsKey(y * cols + x2))
+                    {
+                        x0 = x2; y0 = y;
+                        if (!d1.ContainsKey(y * cols + x2)) d1.Add(y * cols + x2, m);
+                        r = 1; break;
+                    }
+                }
+                r++;
+            }
+        }
+
+
+        //============================= 
+        //回字膨胀算法搜索临近点(很快)：
+        private void refind2(int x0, int y0)
+        {
+            int r = 1;
+            while (d0.Count > 0)
+            {
+                if (d1.ContainsKey(y0 * cols + x0)) d0.Remove(y0 * cols + x0);
+                //left --> right:                
+                for (int x = x0 - r; x <= x0 + r; x += 5)
+                {
+                    int y1 = y0 - r;
+                    int y2 = y0 + r;
+                    if (d0.ContainsKey(y1 * cols + x))
+                    {
+                        x0 = x; y0 = y1;
+                        if (!d1.ContainsKey(y1 * cols + x)) d1.Add(y1 * cols + x, m);
+                        r = 1; m++; break;
+                    }
+                    if (d0.ContainsKey(y2 * cols + x))
+                    {
+                        x0 = x; y0 = y2;
+                        if (!d1.ContainsKey(y2 * cols + x)) d1.Add(y2 * cols + x, m);
+                        r = 1; m++; break;
+                    }
+                }
+                //top to btm:
+                for (int y = y0 - r; y <= y0 + r; y += 5)
+                {
+                    int x1 = x0 - r;
+                    int x2 = x0 + r;
+                    if (d0.ContainsKey(y * cols + x1))
+                    {
+                        x0 = x1; y0 = y;
+                        if (!d1.ContainsKey(y * cols + x1)) d1.Add(y * cols + x1, m);
+                        r = 1; m++; break;
+                    }
+                    if (d0.ContainsKey(y * cols + x2))
+                    {
+                        x0 = x2; y0 = y;
+                        if (!d1.ContainsKey(y * cols + x2)) d1.Add(y * cols + x2, m);
+                        r = 1; m++; break;
+                    }
+                }
+                r++;
+            }
+
+        }
+
+
+
+
+
+        //双遍历算法搜索临近点(很慢)：
+        private void refind1(int x0, int y0)
+        {
+            int xg = -1; int yg = -1;
+            int k0 = y0 * cols + x0;
+            int tmp = 999999;
+            while (d0.Count > 0)
+            {
+                d0.Remove(k0);
+                foreach (int z in d0.Keys)
+                {
+                    int xi = z % cols;
+                    int yi = z / cols;
+                    int d = (xi - x0) * (xi - x0) + (yi - y0) * (yi - y0);
+                    if (d <= tmp)
+                    {
+                        tmp = d;
+                        xg = xi; yg = yi;
+                    }
+                }
+                x0 = xg; y0 = yg;
+                k0 = y0 * cols + x0;
+                int kg = yg * cols + xg;
+                if (!d1.ContainsKey(kg)) d1.Add(kg, m);
+                m++;
+                tmp = 999999;
+                this.Text = m.ToString();
+            }
+        }
+
+        //膨胀：
+        private void button16_Click(object sender, EventArgs e)
+        {
+            //从视频中获取图像：
+            Image<Bgr, Byte> sobel = frame.Convert<Bgr, Byte>();
+
+            //自定义1*3的核进行X方向的膨胀腐蚀:
+            IntPtr mask =
+                 CvInvoke.cvCreateStructuringElementEx(3, 3, 1, 0,
+                 Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+            CvInvoke.cvDilate(sobel.Ptr, sobel.Ptr, mask, 10);//X方向膨胀连通数字, 黑区缩小
+            this.pictureBox1.Image = sobel.ToBitmap(); //显示在图片框中
+            //CvInvoke.cvNamedWindow("sobel2"); //新窗口名称
+            //CvInvoke.cvShowImage("sobel2", sobel); //弹出新窗口    
+        }
+
+        //腐蚀:
+        private void button17_Click(object sender, EventArgs e)
+        {
+            //从视频中获取图像：
+            Image<Bgr, Byte> sobel = frame.Convert<Bgr, Byte>();
+
+            //自定义1*3的核进行X方向的膨胀腐蚀:
+            IntPtr mask =
+                 CvInvoke.cvCreateStructuringElementEx(3, 3, 1, 0,
+                 Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+            CvInvoke.cvErode(sobel.Ptr, sobel.Ptr, mask, 16);//X方向腐蚀去除碎片，黑区放大
+            this.pictureBox1.Image = sobel.ToBitmap(); //显示在图片框中
+            //CvInvoke.cvNamedWindow("sobel2"); //新窗口名称
+            //CvInvoke.cvShowImage("sobel2", sobel); //弹出新窗口    
+        }
+
+        //膨胀-腐蚀-膨胀:
+        private void button18_Click(object sender, EventArgs e)
+        {
+            //从视频中获取图像：
+            Image<Bgr, Byte> sobel = frame.Convert<Bgr, Byte>();
+
+            //自定义1*3的核进行X方向的膨胀腐蚀:
+            IntPtr mask =
+                 CvInvoke.cvCreateStructuringElementEx(3, 3, 1, 0,
+                 Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+            CvInvoke.cvDilate(sobel.Ptr, sobel.Ptr, mask, 10);//X方向膨胀连通数字
+            CvInvoke.cvErode(sobel.Ptr, sobel.Ptr, mask, 16);//X方向腐蚀去除碎片，黑区放大
+            CvInvoke.cvDilate(sobel.Ptr, sobel.Ptr, mask, 10); //X方向膨胀回复形态, 黑区缩小
+            this.pictureBox1.Image = sobel.ToBitmap(); //显示在图片框中
+            //CvInvoke.cvNamedWindow("sobel2"); //新窗口名称
+            //CvInvoke.cvShowImage("sobel2", sobel); //弹出新窗口    
+        }
+
+
+        //========================
+        private void myRead()
+        {
+            //string path = "x.JPG";
+            //ArrayList list = new ArrayList();
+            //list.Clear();
+            //Image<Bgr, byte> src = new Image<Bgr, byte>(path);
+            //Image<Gray, byte> graySrc = src.Convert<Gray, byte>();
+            //CvInvoke.cvSmooth(graySrc.Ptr,graySrc.Ptr,Emgu.CV.CvEnum.SMOOTH_TYPE.CV_GAUSSIAN,3,3,0,0);
+            //Image<Gray, byte> sobel = new Image<Gray, byte>(path);
+            //CvInvoke.cvSobel(graySrc.Ptr, sobel.Ptr, 2, 0, 3);
+            //CvInvoke.cvNamedWindow("sobel");
+            //CvInvoke.cvShowImage("sobel", sobel);
+            //CvInvoke.cvThreshold(sobel.Ptr, sobel.Ptr, 0, 255, Emgu.CV.CvEnum.THRESH.CV_THRESH_OTSU);
+
+            //自定义1*3的核进行X方向的膨胀腐蚀
+            Image<Bgr, Byte> sobel = frame.Convert<Bgr, Byte>();
+
+            IntPtr mask =
+                 CvInvoke.cvCreateStructuringElementEx(3, 3, 1, 0,
+                 Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+            CvInvoke.cvDilate(sobel.Ptr, sobel.Ptr, mask, 10);//X方向膨胀连通数字
+            CvInvoke.cvErode(sobel.Ptr, sobel.Ptr, mask, 16);//X方向腐蚀去除碎片
+            //CvInvoke.cvDilate(sobel.Ptr, sobel.Ptr, mask, 10); //X方向膨胀回复形态
+            this.pictureBox1.Image = sobel.ToBitmap(); //显示在图片框中
+            //CvInvoke.cvNamedWindow("sobel2"); //新窗口名称
+            //CvInvoke.cvShowImage("sobel2", sobel); //弹出新窗口          
+
+            ////自定义3*1的核进行Y方向的膨胀腐蚀
+
+            //mask =
+            //      CvInvoke.cvCreateStructuringElementEx(1, 3, 0, 1,
+            //      Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+
+            //CvInvoke.cvErode(sobel.Ptr, sobel.Ptr, mask, 1);// Y方向腐蚀去除碎片
+            //CvInvoke.cvDilate(sobel.Ptr, sobel.Ptr, mask, 6);//回复形态
+            //CvInvoke.cvNamedWindow("sobel2");
+            //CvInvoke.cvShowImage("sobel2", sobel);
+
+            ////轮廓检测：
+            //IntPtr storage = CvInvoke.cvCreateMemStorage(0);
+            //MCvSeq comp1 = new MCvSeq();
+            //comp1.ptr = new IntPtr();
+            //IntPtr Dyncontour = new IntPtr();
+            //int n = CvInvoke.cvFindContours(sobel.Ptr,
+            //    storage,
+            //    ref Dyncontour,
+            //    10,
+            //    Emgu.CV.CvEnum.RETR_TYPE.CV_RETR_CCOMP,
+            //    Emgu.CV.CvEnum.CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_NONE,
+            //    new Point(0, 0));
+
+            //Seq<Point> DyncontourTemp1 = new Seq<Point>(Dyncontour, null);//方便对IntPtr类型进行操作
+            //Seq<Point> DyncontourTemp = DyncontourTemp1;
+            //Image<Bgr, byte> tempContImg = new Image<Bgr, byte>(path);
+            //double area;
+
+            //for (; DyncontourTemp != null && DyncontourTemp.Ptr.ToInt32() != 0; DyncontourTemp = DyncontourTemp.HNext)
+            //{
+
+            //    Rectangle rect = CvInvoke.cvBoundingRect(DyncontourTemp, false);
+
+            //    if (rect.Width > 2.8 * rect.Height && rect.Width < 3.5 * rect.Height)//
+            //    {
+            //        //抠到图了
+            //        Image<Bgr, byte> dst = new Image<Bgr, byte>(rect.Width, rect.Height);
+            //        CvInvoke.cvSetImageROI(tempContImg.Ptr, rect);
+            //        CvInvoke.cvCopy(tempContImg.Ptr, dst.Ptr, new IntPtr());
+            //        list.Add(dst);
+            //        CvInvoke.cvSaveImage("p1.jpg", new IntPtr());
+            //        CvInvoke.cvResetImageROI(tempContImg);
+            //    }
+            //    CvInvoke.cvDrawContours(tempContImg.Ptr, DyncontourTemp,
+            //        new MCvScalar(255, 255, 255), new MCvScalar(255, 255, 255), 0, 1,
+            //        Emgu.CV.CvEnum.LINE_TYPE.EIGHT_CONNECTED, new Point(0, 0));
+            //}
+            ////Rectangle rect = CvInvoke.cvBoundingRect(DyncontourTemp, false);
+            //CvInvoke.cvShowImage("cont", tempContImg);
+        }
+
+        //模糊灰度化：
+        private void button19_Click(object sender, EventArgs e)
+        {
+            //从视频中获取图像：
+            //Image<Bgr, Byte> img = frame.Convert<Bgr, Byte>();
+
+            //从视频中获取图像,模糊灰度化处理：
+            Image<Gray, byte> graySrc = frame.Convert<Gray, byte>();
+            CvInvoke.cvSmooth(graySrc.Ptr, graySrc.Ptr, Emgu.CV.CvEnum.SMOOTH_TYPE.CV_GAUSSIAN, 25, 25, 0, 0);
+
+            this.pictureBox1.Image = graySrc.ToBitmap(); //显示在图片框中
+        }
+
+        private void button20_Click(object sender, EventArgs e)
+        {
+            //从视频中获取图像：
+            Image<Bgr, Byte> ff = frame.Convert<Bgr, Byte>(); //BGR
+            // Image<Gray, byte> ff = frame.Convert<Gray, byte>(); //GRAY
+
+            byte b = 0; byte g = 0; byte r = 0;
+
+            //人脸肤色： R:252 G:216 B:190
+            byte fr = 252; byte fg = 216; byte fb = 190;
+
+            Byte[, ,] bgrData = ff.Data;
+
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //注： Math.Abs(fr - fb) / Math.Abs(fr - fg)=1.7
+                    if (Math.Abs(fr - r) < 50 && Math.Abs(fg - g) < 50 && Math.Abs(fb - b) < 50)  //
+                    {
+                        bgrData[i, j, 0] = fb;//B
+                        bgrData[i, j, 1] = fg;//G
+                        bgrData[i, j, 2] = fr;//R
+                    }
+                    else
+                    {
+                        bgrData[i, j, 0] = b;
+                        bgrData[i, j, 1] = 0;
+                        bgrData[i, j, 2] = 0;
+                    }
+
+                }
+            }
+
+            int k = 0;
+            for (int i = 50; i < rows - 50; i += 50)
+            {
+                for (int j = 50; j < cols - 50; j += 50)
+                {
+                    for (int x = 0; x < 50; x++)
+                    {
+                        for (int y = 0; y < 50; y++)
+                        {
+                            r = bgrData[i + x, j + y, 2];
+                            if (r == 252)
+                            {
+                                k++;
+                            }
+                        }
+                    }
+                    if (k > 500)
+                    {
+                        Bgr c0 = new Bgr(0, 0, 250);
+                        ff.Draw(new Rectangle(j, i, 50, 50), c0, 2);
+                    }
+                    k = 0;
+                }
+            }
+            this.pictureBox1.Image = ff.ToBitmap();
+
+        }
+
+        //十字法去噪：
+        private void button21_Click(object sender, EventArgs e)
+        {
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.BackColor = Color.FromArgb(255, 255, 255);
+
+            //this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+
+            this.pictureBox1.Refresh();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //灰度化：
+                    byte gy = (byte)((r + g + b) / 3);
+                    //二值化：
+                    bgrData[i, j, 0] = (byte)(gy > 200 ? 255 : 0);
+                }
+            //四点式梯度,十字形：
+            for (int i = 5; i < rows - 5; i += 5)
+            {
+                for (int j = 5; j < cols - 5; j += 5)
+                {
+                    byte bt = bgrData[i, j - 5, 0];
+                    byte bm = bgrData[i, j + 5, 0];
+                    byte bl = bgrData[i - 5, j, 0];
+                    byte br = bgrData[i + 5, j, 0];
+                    if (bt + bm + bl + br == 0)
+                    {
+                        Pen pen = new Pen(Color.FromArgb(0, 0, 100), 1);
+
+                        // (实心刷):                        
+                        SolidBrush bh = new SolidBrush(Color.Black);
+                        //SolidBrush bh = new SolidBrush(Color.Aquamarine);
+                        //SolidBrush bh = new SolidBrush(Color.DarkOrange);
+
+                        //(梯度刷):
+                        //LinearGradientBrush bh = new LinearGradientBrush(rect1,      Color.DarkOrange, Color.Aquamarine,   LinearGradientMode.BackwardDiagonal);
+
+                        //(阴影刷):
+                        //HatchBrush bh = new HatchBrush(HatchStyle.DiagonalCross, Color.DarkOrange, Color.Aquamarine);
+                        //HatchBrush bh = new HatchBrush(HatchStyle.DarkVertical,Color.DarkOrange, Color.Aquamarine);
+                        //HatchBrush bh = new HatchBrush(HatchStyle.LargeConfetti, Color.DarkOrange, Color.Aquamarine);
+
+                        //(位图刷)：
+                        //TextureBrush bh = new TextureBrush(new Bitmap("mini.jpg")); //小图
+
+                        //gc.DrawEllipse(pen, j, i, 1, 1);
+
+                        //gc.FillRectangle(bh, j, i, 10, 10);
+
+                        Rectangle myRect = new Rectangle(j, i, 10, 10);
+                        //gc.FillRectangle(bh, myRect);
+                        gc.FillEllipse(bh, myRect);
+                    }
+                }
+            }
+
+        }
+
+        //斑纹特征点：
+        private void button22_Click(object sender, EventArgs e)
+        {
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //this.pictureBox1.BackColor = Color.FromArgb(255, 255, 255);
+
+            this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+
+            //this.pictureBox1.Refresh();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //灰度化：
+                    byte gy = (byte)((r + g + b) / 3);
+                    //二值化：
+                    bgrData[i, j, 0] = (byte)(gy > 127 ? 1 : 0);
+                }
+            //四点式：
+            int j0 = cols / 2; int i0 = rows / 2;
+            for (int i = 5; i < rows - 5; i += 5)
+            {
+                for (int j = 5; j < cols - 5; j += 5)
+                {   //对角线上四点：
+                    byte at = bgrData[i - 5, j - 5, 0];
+                    byte am = bgrData[i - 5, j + 5, 0];
+                    byte al = bgrData[i + 5, j - 5, 0];
+                    byte ar = bgrData[i + 5, j + 5, 0];
+                    //十字线上四点：
+                    byte bt = bgrData[i, j - 5, 0];
+                    byte bm = bgrData[i, j + 5, 0];
+                    byte bl = bgrData[i - 5, j, 0];
+                    byte br = bgrData[i + 5, j, 0];
+                    if ((bt * bm * bl * br == 1) && (at + am + al + ar < 2))
+                    {
+                        //对角线为0，十字线上为1：
+                        //Pen pen = new Pen(Color.FromArgb(0, 0, 100), 1);
+
+                        // (实心刷):                        
+                        //SolidBrush bh = new SolidBrush(Color.Black);
+                        //SolidBrush bh = new SolidBrush(Color.Aquamarine);
+                        //SolidBrush bh = new SolidBrush(Color.DarkOrange);
+
+                        //(梯度刷):
+                        //LinearGradientBrush bh = new LinearGradientBrush(rect1,      Color.DarkOrange, Color.Aquamarine,   LinearGradientMode.BackwardDiagonal);
+
+                        //(阴影刷):
+                        //HatchBrush bh = new HatchBrush(HatchStyle.DiagonalCross, Color.DarkOrange, Color.Aquamarine);
+                        //HatchBrush bh = new HatchBrush(HatchStyle.DarkVertical,Color.DarkOrange, Color.Aquamarine);
+                        //HatchBrush bh = new HatchBrush(HatchStyle.LargeConfetti, Color.DarkOrange, Color.Aquamarine);
+
+                        //(位图刷)：
+                        //TextureBrush bh = new TextureBrush(new Bitmap("mini.jpg")); //小图
+
+                        //gc.DrawEllipse(pen, j, i, 1, 1);
+
+                        //gc.FillRectangle(bh, j, i, 10, 10);
+
+                        //Rectangle myRect = new Rectangle(j, i, 10, 10);
+                        //gc.FillRectangle(bh, myRect);
+                        //gc.FillEllipse(bh, myRect);
+
+                        //gc.DrawLine(pen, j, i, j0, i0); //Pen pen = new Pen(Color.FromArgb(0, 0, 100), 1);
+                        //j0 = i; i0 = j;
+
+                        //中心坐标：
+                        PointF pf = new PointF(j, i);
+                        Bgr c0 = new Bgr(0, 255, 0);
+                        //画圆与十字线：
+                        f2.Draw(new CircleF(pf, 20), c0, 2);
+                        f2.Draw(new Cross2DF(pf, 20, 20), c0, 2);
+                    }
+                }
+            }
+            //图片框重绘：
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //横向中点集：
+        private void button23_Click(object sender, EventArgs e)
+        {
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //this.pictureBox1.BackColor = Color.FromArgb(255, 255, 255);
+
+            this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+
+            //this.pictureBox1.Refresh();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+            Byte[, ,] tData = f2.Data;
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //灰度化：
+                    byte gy = (byte)((r + g + b) / 3);
+                    //二值化：
+                    bgrData[i, j, 0] = (byte)(gy < 127 ? 1 : 0);
+                    bgrData[i, j, 1] = (byte)(gy < 127 ? 1 : 0);
+                    //bgrData[i, j, 2] = (byte)(gy < 127 ? 1 : 0);
+                }
+            //四点式：
+            int j0 = cols / 2; int i0 = rows / 2;
+            bool flg = false;
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    byte bi = bgrData[i, j, 0];
+
+                    if (bi == 1 && flg == false)//起点
+                    {
+                        j0 = j; i0 = i;
+                        flg = true;
+                    }
+                    if (bi == 0 && flg == true)
+                    { //终点
+                        //v++;  
+                        flg = false;
+                        bgrData[i, (j + j0) / 2, 0] = 255;// (byte)(v % 255);
+                        bgrData[i, (j + j0) / 2, 1] = 255;// (byte)(v % 255);
+                        //bgrData[i, (j + j0) / 2, 2] = 255;// (byte)(v % 255);
+                        //v = 0;
+                    }
+                }
+            }
+            //图片框重绘：
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //双向中点集（骨骼化）
+        private void button24_Click(object sender, EventArgs e)
+        {
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //this.pictureBox1.BackColor = Color.FromArgb(255, 255, 255);
+
+            this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+
+            //this.pictureBox1.Refresh();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+            Byte[, ,] tData = f2.Data;
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //灰度化：
+                    byte gy = (byte)((r + g + b) / 3);
+                    //二值化：
+                    bgrData[i, j, 0] = (byte)(gy < 100 ? 1 : 0);
+                    bgrData[i, j, 1] = 0;// (byte)(gy < 127 ? 1 : 0);
+                    bgrData[i, j, 2] = 0;// (byte)(gy < 127 ? 1 : 0);
+                }
+            //四点式：
+            int j0 = cols / 2; int i0 = rows / 2;
+            bool flg = false;
+
+            //横向中点集：
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    byte bi = bgrData[i, j, 0];
+
+                    if (bi == 1 && flg == false)//起点
+                    {
+                        j0 = j; i0 = i;
+                        flg = true;
+                    }
+                    if (bi == 0 && flg == true)
+                    { //终点
+                        //v++;  
+                        flg = false;
+                        bgrData[i, (j + j0) / 2, 0] = 255;// (byte)(v % 255);
+                        bgrData[i, (j + j0) / 2, 1] = 255;// (byte)(v % 255);
+                        bgrData[i, (j + j0) / 2, 2] = 255;// (byte)(v % 255);
+                        if (!d0.ContainsKey(i * cols + (j + j0) / 2)) d0.Add(i * cols + (j + j0) / 2, 0); //i:行，j:列
+                        //v = 0;
+                    }
+                }
+            }
+            //纵向中点集：
+            for (int j = 0; j < cols; j++)
+            {
+                for (int i = 0; i < rows; i++)
+                {
+
+                    byte bi = bgrData[i, j, 0];
+
+                    if (bi == 1 && flg == false)//起点
+                    {
+                        j0 = j; i0 = i;
+                        flg = true;
+                    }
+                    if (bi == 0 && flg == true)
+                    {   //终点
+                        //v++;  
+                        flg = false;
+                        int im = (i + i0) / 2;
+                        bgrData[im, j, 0] = 255;// (byte)(v % 255);
+                        bgrData[im, j, 1] = 255;// (byte)(v % 255);
+                        bgrData[im, j, 2] = 255;// (byte)(v % 255);
+                        if (!d0.ContainsKey(cols * im + j)) d0.Add(cols * im + j, 0); //i:行，j:列
+                        //v = 0;
+                    }
+                }
+            }
+
+            //图片框重绘：
+            this.pictureBox1.Image = f2.ToBitmap();
+
+            MessageBox.Show(d0.Count.ToString());
+            button11_Click(null, null);//矢量化；
+        }
+
+        //12类位运算:
+        private void button25_Click(object sender, EventArgs e)
+        {
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //this.pictureBox1.BackColor = Color.FromArgb(255, 255, 255);            
+            //this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+            Byte[, ,] gData = new Byte[rows, cols, 3];
+            Byte[, ,] tData = f2.Data;
+            m++;
+            //byte k = (byte)(DateTime.Now.Second % 5);
+            byte k = (byte)(m % 12);
+            //k = 11;
+            this.Text = k.ToString();
+            for (int i = 1; i < rows - 1; i++)
+            {
+                for (int j = 1; j < cols - 1; j++)
+                {
+                    if (tData[i, j, 0] < 200)
+                    {
+                        if (k == 0) tData[i, j, 1] = (byte)(i * j);
+                        if (k == 1) tData[i, j, 1] = (byte)((i + j) * (i - j));
+                        if (k == 2) tData[i, j, 1] = (byte)(i ^ j);
+                        if (k == 3) tData[i, j, 1] = (byte)((i + j) ^ (i - j));
+                        if (k == 4) tData[i, j, 1] = (byte)(127 + 127 * Math.Sin(i * j / 2));
+                        if (k == 5)
+                        {
+                            int k2 = 2; int k1 = -1;
+                            tData[i, j, 0] = (byte)(k1 * tData[i, j, 0] + k2 * tData[i, j - 1, 0]);
+                            tData[i, j, 1] = (byte)(k1 * tData[i, j, 1] + k2 * tData[i, j - 1, 1]);
+                            tData[i, j, 2] = (byte)(k1 * tData[i, j, 2] + k2 * tData[i, j - 1, 2]);
+                        }
+                        if (k == 6)
+                        {
+                            tData[i, j, 0] = (byte)(100 + 155 * Math.Sin(i * j / 8));
+                            tData[i, j, 1] = (byte)(100 + 155 * Math.Sin(i * j / 8));
+                            tData[i, j, 2] = (byte)(100 + 155 * Math.Sin(i * j / 8));
+                        }
+                        if (k == 7)
+                        {
+                            int kk = 2;
+                            tData[i, j, 0] = (byte)(kk * tData[i, j, 0] % 255);
+                            tData[i, j, 1] = (byte)(kk * tData[i, j, 0] % 255);
+                            tData[i, j, 2] = (byte)(kk * tData[i, j, 0] % 255);
+                        }
+                        if (k == 8)
+                        {
+                            int kk = 2;
+                            tData[i, j, 0] = (byte)(255 - tData[i, j, 0]);
+                            tData[i, j, 1] = (byte)(kk * tData[i, j, 0] % 255);
+                            tData[i, j, 2] = (byte)(kk * tData[i, j, 0] % 255);
+                        }
+
+                    }
+                    if (k == 9)
+                    {
+                        tData[i, j, 0] = (byte)(1.3 * tData[i, j, 0]);
+                        tData[i, j, 1] = (byte)(1.5 * tData[i, j, 1]);
+                        tData[i, j, 2] = (byte)(1.7 * tData[i, j, 2]);
+
+                    }
+                    if (k == 10)
+                    {
+                        tData[i, j, 0] = (byte)(1 * tData[i, j, 0]);
+                        tData[i, j, 1] = (byte)(2 * tData[i, j, 1]);
+                        tData[i, j, 2] = (byte)(3 * tData[i, j, 2]);
+                    }
+                }
+            }
+
+            if (k == 11)
+            {
+                for (int i = 2; i < rows - 2; i++)
+                {
+                    for (int j = 2; j < cols - 2; j++)
+                    {
+                        byte tp = tData[i - 2, j, 0];
+                        byte bm = tData[i + 2, j, 0];
+                        byte lf = tData[i, j - 2, 0];
+                        byte rt = tData[i, j + 2, 0];
+                        byte bi = tData[i, j, 0];
+                        if (Math.Abs(tp - bm) > 50 || Math.Abs(lf - rt) > 50)
+                        {
+                            gData[i, j, 0] = 0;
+                            gData[i, j, 1] = 0;
+                            gData[i, j, 2] = 0;
+                        }
+                        else
+                        {
+                            gData[i, j, 0] = (byte)(tp + bm);
+                            gData[i, j, 1] = 120;
+                            gData[i, j, 2] = (byte)(rt + lf);
+                        }
+                    }
+                }
+                f2.Data = gData;
+            }
+
+
+            //图片框重绘：
+            this.pictureBox1.Image = f2.ToBitmap();
+            f2.Save("img_" + k + ".jpg"); //图片保存为文件
+        }
+
+        //十字梯度轮廓化
+        private void button26_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>(); ;//构建灰度区域对象            
+            this.pictureBox1.Image = f2.ToBitmap();
+
+            //this.pictureBox1.BackColor = Color.FromArgb(255, 0, 255);
+
+            //this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+
+            //this.pictureBox1.Refresh();
+            Byte[, ,] tData = f2.Data;
+            Byte[, ,] rData = new Byte[rows, cols, 1];
+
+            for (int i = 2; i < rows - 2; i++)
+            {
+                for (int j = 2; j < cols - 2; j++)
+                {
+                    byte tp = tData[i - 2, j, 0];
+                    byte bm = tData[i + 2, j, 0];
+                    byte lf = tData[i, j - 2, 0];
+                    byte rt = tData[i, j + 2, 0];
+                    byte bi = tData[i, j, 0];
+                    if (Math.Abs(tp - bm) > 50 || Math.Abs(lf - rt) > 50) //轮廓阀值：50
+                    {
+                        rData[i, j, 0] = 0;
+                        //中心坐标：
+                        //PointF pf = new PointF(j, i);
+                        //Gray c0 = new Gray(255);
+                        //画圆与十字线：
+                        //f2.Draw(new CircleF(pf, 20), c0, 2);
+                        //f2.Draw(new Cross2DF(pf, 20, 20), c0, 1);
+                    }
+                    else
+                    {
+                        rData[i, j, 0] = 255;
+                    }
+
+                }
+            }
+            f2.Data = rData;
+
+            //图片框重绘：
+            this.pictureBox1.Image = f2.ToBitmap();
+
+        }
+
+        //灰度加轮廓
+        private void button27_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>(); ;//构建灰度区域对象            
+            this.pictureBox1.Image = f2.ToBitmap();
+
+            //this.pictureBox1.BackColor = Color.FromArgb(255, 0, 255);
+
+            //this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+
+            //this.pictureBox1.Refresh();
+            Byte[, ,] tData = f2.Data;
+            Byte[, ,] rData = new Byte[rows, cols, 1];
+
+            for (int i = 2; i < rows - 2; i++)
+            {
+                for (int j = 2; j < cols - 2; j++)
+                {
+                    byte tp = tData[i - 2, j, 0];
+                    byte bm = tData[i + 2, j, 0];
+                    byte lf = tData[i, j - 2, 0];
+                    byte rt = tData[i, j + 2, 0];
+                    byte bi = tData[i, j, 0];
+                    if (Math.Abs(tp - bm) < 50 && Math.Abs(lf - rt) < 50) //轮廓阀值：50
+                    {
+                        rData[i, j, 0] = tData[i, j, 0];
+                        //中心坐标：
+                        //PointF pf = new PointF(j, i);
+                        //Gray c0 = new Gray(255);
+                        //画圆与十字线：
+                        //f2.Draw(new CircleF(pf, 20), c0, 2);
+                        //f2.Draw(new Cross2DF(pf, 20, 20), c0, 1);
+                    }
+                    else
+                    {
+                        rData[i, j, 0] = 0;
+                    }
+
+                }
+            }
+            f2.Data = rData;
+
+            //图片框重绘：
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //骨骼粗细分析：
+        private void button28_Click(object sender, EventArgs e)
+        {
+
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.BackColor = Color.FromArgb(0, 0, 0);
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            //this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+
+            this.pictureBox1.Refresh();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+            Byte[, ,] tData = f2.Data;
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //灰度化：
+                    byte gy = (byte)((r + g + b) / 3);
+                    //二值化：
+                    bgrData[i, j, 0] = (byte)(gy < 100 ? 1 : 0);
+                    //bgrData[i, j, 1] = 0;// (byte)(gy < 127 ? 1 : 0);
+                    //bgrData[i, j, 2] = 0;// (byte)(gy < 127 ? 1 : 0);
+                }
+            //四点式：
+            int j0 = cols / 2; int i0 = rows / 2;
+            int v = 0; bool flg = false;
+
+            //横向中点集：
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    byte bi = bgrData[i, j, 0];
+
+                    if (bi == 1 && flg == false)//起点
+                    {
+                        j0 = j; i0 = i;
+                        flg = true;
+                        v = 0;
+                    }
+
+                    if (bi == 1 && flg == true)
+                    {
+                        v += 5;
+                    }
+
+                    if (bi == 0 && flg == true)
+                    {  //终点                        
+                        flg = false;
+                        //Pen pen = new Pen(Color.FromArgb(v % 255, 255 - v % 255, v % 255), v/100);
+                        Pen p2 = new Pen(Color.FromArgb(255, 255, 255), 5);
+                        //gc.DrawEllipse(pen, (j + j0) / 2, i, 2, 2); //
+                        if (v < 250) gc.DrawLine(p2, (j + j0) / 2, i - 1, (j + j0) / 2, i + 1);
+                        //bgrData[i, (j + j0) / 2, 0] =  (byte)(v % 255);
+                        //bgrData[i, (j + j0) / 2, 1] =  (byte)(255-v % 255);
+                        //bgrData[i, (j + j0) / 2, 2] = (byte)(v % 255);
+                        //if (!d0.ContainsKey(i * cols + (j + j0) / 2)) d0.Add(i * cols + (j + j0) / 2, 0); //i:行，j:列
+                        v = 0;
+                    }
+                }
+            }
+            //纵向中点集：
+            for (int j = 0; j < cols; j++)
+            {
+                for (int i = 0; i < rows; i++)
+                {
+                    byte bi = bgrData[i, j, 0];
+
+                    if (bi == 1 && flg == false)//起点
+                    {
+                        j0 = j; i0 = i;
+                        flg = true;
+                        v = 0;
+                    }
+
+                    if (bi == 1 && flg == true)
+                    {
+                        v += 5;
+                    }
+
+                    if (bi == 0 && flg == true)
+                    {   //终点                        
+                        flg = false;
+                        //Pen pen = new Pen(Color.FromArgb(v % 255, 255 - v % 255, v % 255), v/100);
+                        Pen p2 = new Pen(Color.FromArgb(255, 255, 255), 5);
+                        //gc.DrawEllipse(pen, j, (i + i0) / 2, 2, 2); //
+                        if (v < 250) gc.DrawLine(p2, j - 1, (i + i0) / 2, j + 1, (i + i0) / 2);
+
+                        // bgrData[(i + i0) / 2, j, 0] =  (byte)(v % 255);
+                        // bgrData[(i + i0) / 2, j, 1] =  (byte)(255-v % 255);
+                        // bgrData[(i + i0) / 2, j, 2] =  (byte)(v % 255);
+                        // if (!d0.ContainsKey(cols * (i + i0) / 2 + j)) d0.Add(cols * (i + i0) / 2 + j, 0); //i:行，j:列
+                        v = 0;
+                    }
+                }
+            }
+
+            //图片框重绘,用g画图时不用：
+            //this.pictureBox1.Image = f2.ToBitmap();
+
+            //this.Text="已经装入字典中的点集："+d0.Count.ToString();  
+
+        }
+
+        //网格化处理
+        private void button29_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.BackColor = Color.FromArgb(0, 0, 0);
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            //this.pictureBox1.Image = f2.ToBitmap(); //使用本句：视频图像作背景。注释本句：背景白色。
+
+            this.pictureBox1.Refresh();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+            Byte[, ,] tData = f2.Data;
+
+            //图像二值化:
+            for (int i = 0; i < rows; i++) //i:y, j:x
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    //灰度化：
+                    byte gy = (byte)((r + g + b) / 3);
+                    //二值化：
+                    bgrData[i, j, 0] = (byte)(gy < 100 ? 1 : 0);
+                    //bgrData[i, j, 1] =  (byte)(gy < 100 ? 0 : 255);
+                }
+
+            //纵横对比点集：
+            int j0 = cols / 2; int i0 = rows / 2;
+            for (int i = 10; i < rows - 10; i += 10)
+            {
+                for (int j = 10; j < cols - 10; j += 10)
+                {
+                    byte bi = bgrData[i, j, 0];
+                    if (bi == 0)
+                    {
+                        Pen pen = new Pen(Color.FromArgb(255, 255, 255), 4);
+                        //gc.DrawEllipse(pen, j, i, 4, 4);
+                        gc.DrawRectangle(pen, j, i, 4, 4);
+                    }
+                }
+            }
+
+
+            //图片框重绘,用gc画图时不用：
+            //this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //Canny轮廓
+        private void button30_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>();
+            this.pictureBox1.Image = f2.Canny(new Gray(120), new Gray(60)).ToBitmap();
+        }
+
+        //计算均值与标准差:
+        private void button31_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> img = frame.Convert<Gray, Byte>();  //new Image<Gray, float>("c:\\test_image.jpg");
+
+            MCvScalar average = new MCvScalar();
+            MCvScalar std = new MCvScalar();
+            CvInvoke.cvAvgSdv(img, ref average, ref std, IntPtr.Zero);
+            double[] v1 = average.ToArray();
+            double[] v2 = std.ToArray();
+
+            MessageBox.Show("各通道(Gray,B,G,R)之平均值:" + v1[0].ToString() + "," + v1[1].ToString() + "," + v1[2].ToString() + "," + v1[3].ToString());
+            MessageBox.Show("各通道(Gray,B,G,R)之标准差:" + v2[0].ToString() + "," + v2[1].ToString() + "," + v2[2].ToString() + "," + v2[3].ToString());
+
+            //MCvScalar Avg = CvInvoke.cvAvg(img, IntPtr.Zero);
+            //double[] v=  Avg.ToArray();
+            //MessageBox.Show("平均值:" +v[0].ToString());
+        }
+
+        //黑区喷绘拟合
+        private void button32_Click(object sender, EventArgs e)
+        {
+            //==================================================
+
+            //从视频中获取图像：
+            Image<Bgr, Byte> img = frame.Convert<Bgr, Byte>();
+            //Image<Gray, Byte> img = frame.Convert<Gray, Byte>();
+
+            //自定义(3x3 ?)的核进行X方向的腐蚀:
+            IntPtr mask =
+                 CvInvoke.cvCreateStructuringElementEx(3, 3, 1, 1,
+                 Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+            CvInvoke.cvErode(img.Ptr, img.Ptr, mask, 4);//腐蚀去除碎片，黑区放大
+            this.pictureBox1.Image = img.ToBitmap(); //显示在图片框中
+
+            //自定义3*3的核进行X方向的膨胀:
+            IntPtr mask2 =
+                 CvInvoke.cvCreateStructuringElementEx(3, 3, 1, 1,
+                 Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+            CvInvoke.cvDilate(img.Ptr, img.Ptr, mask2,4);//膨胀连通数字, 黑区缩小
+            this.pictureBox1.Image = img.ToBitmap(); //显示在图片框中
+           
+            this.pictureBox1.BackColor = Color.FromArgb(110, 180, 160);
+            Graphics gc = this.pictureBox1.CreateGraphics();
+            this.pictureBox1.Refresh();
+
+            
+            //gc.DrawEllipse(pen, x, y, 2, 2);
+            //==================================================
+            byte[, ,] dt = img.Data;
+            byte[, ,] dr = new byte[img.Height,img.Width ,3];
+            byte b0,b1,b2,b3,b4,b5,b6,b7,b8;
+            
+            //二值化:
+            for (int y = 0; y < rows ; y++)
+            {
+                for (int x = 0; x < cols; x ++)
+                {
+                    dt[y, x, 0] =(byte) (dt[y, x, 0]>128 ? 255:0);
+                }
+            }
+            
+            //黑边缩小:
+            for (int y = 5; y < rows-5;y+=5 )
+            {
+                for (int x = 5; x < cols-5;x+=5)
+                {
+                    b0 = dt[y-5, x-5, 0];
+                    b1 = dt[y-5, x, 0];
+                    b2 = dt[y-5, x+5, 0];
+                    b3 = dt[y, x-1, 0];
+                    b4 = dt[y, x, 0];
+                    b5 = dt[y, x+1, 0];
+                    b6 = dt[y+5, x-5, 0];
+                    b7 = dt[y+5, x, 0];
+                    b8 = dt[y+5, x+5, 0];  
+
+                    //dt[y, x, 0] = (byte)((bi < 127) ? 255 : 0);
+                    bool bb=(b1==b7 && b3==b5 && b0==b8 && b2==b6 && b4<128); //当四周全是黑点时,bb=TRUE
+                    dr[y, x, 0] = (byte)(bb ? 255 : 0); dr[y, x, 1] = (byte)(bb ? 255 : 0); dr[y, x, 2] = (byte)(bb ? 255 : 0);
+
+                    if (bb){
+                        int xx =(int) Math.Round((double)(x / 20)); 
+                        int yy =(int) Math.Round((double)(y / 20));
+                        int c = yy * cols + xx;
+                        Pen pen = new Pen(Color.FromArgb(255-c % 255, 2*c % 255, 3*c % 255), 5);
+                        gc.DrawRectangle(pen,20* xx, 20*yy, 5, 5);
+                    }
+
+                }
+
+            }
+
+            MessageBox.Show("目前是Graphic视图,接着将显示像素级点阵;");
+            //用img.Data[,,]画图时必须:
+            img.Data = dr;
+            this.pictureBox1.Image = img.ToBitmap();
+        }
+
+        //铁锈化：
+        private void button33_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    byte bb = (byte)((b ^ g ^ r));
+                    bgrData[i, j, 0] = (byte)(bb);
+                    bgrData[i, j, 1] = (byte)(bb);
+                    bgrData[i, j, 2] = (byte)(r); 
+                }
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //大块化骨骼线:
+        private void button34_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+
+            //自定义1*3的核进行X方向的腐蚀:
+            IntPtr mask2 =
+                 CvInvoke.cvCreateStructuringElementEx(5, 5, 1, 1,
+                 Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+            CvInvoke.cvErode(f2.Ptr, f2.Ptr, mask2, 2);//X方向腐蚀去除碎片，黑区放大
+
+            //自定义1*3的核进行X方向的膨胀:
+            IntPtr mask =
+                 CvInvoke.cvCreateStructuringElementEx(5, 5, 1, 1,
+                 Emgu.CV.CvEnum.CV_ELEMENT_SHAPE.CV_SHAPE_RECT, new IntPtr());//自定义一个核
+            CvInvoke.cvDilate(f2.Ptr, f2.Ptr, mask, 2);//X方向膨胀连通数字, 黑区缩小
+
+            Byte[, ,] bgrData = f2.Data;
+
+            //二值化：
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    byte bb = (byte)((b + g + r)/3>127?255:0);
+                    bgrData[i, j, 0] = (byte)(bb);
+                    bgrData[i, j, 1] = (byte)(bb);
+                    bgrData[i, j, 2] = (byte)(bb);
+                }
+
+
+            bool k = false;
+            int  x0=0;
+            int  y0=0;
+            //从左到右：
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    if(j==0 && b==0){
+                        k = true;
+                        x0 = 0;
+                    }
+                    if(k==false && b==0){
+                        k = true;
+                        x0 = j;
+                    }
+
+                    if(b==255 && k==true ){
+                        k = false;
+                        bgrData[i, (x0+j)/2, 1] = 255;
+                        if (!d0.ContainsKey(i * cols + (x0 + j) / 2)) d0.Add(i * cols + (x0 + j) / 2, 1);
+                    }
+                }
+            //从上到下：
+            for (int j = 0; j < cols; j++)
+                    for (int i = 0; i < rows; i++)
+                    {
+                        b = bgrData[i, j, 0];
+                        if (i == 0 && b == 0)
+                        {
+                            k = true;
+                            y0 = 0;
+                        }
+                        if (k == false && b == 0)
+                        {
+                            k = true;
+                            y0 = i;
+                        }
+
+                        if (b == 255 && k == true)
+                        {
+                            k = false;
+                            bgrData[(y0 + i) / 2, j, 1] = 255;
+                            if (!d0.ContainsKey(cols * (y0 + i) / 2 + j)) d0.Add(cols * (y0 + i) / 2 + j, 1);
+                        }
+                    }
+            this.pictureBox1.Image = f2.ToBitmap();
+            MessageBox.Show(d0.Count.ToString());
+            button11_Click(null, null);//矢量化；
+            
+        }
+
+        //一维矩阵算子
+        private void button35_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>();
+            Byte[, ,] dp0 = f2.Data;
+            Byte[, ,] dp1 = new byte[rows, cols, 1];
+
+            byte[] a0 = new byte[3];
+            double[] a1=new double[3];
+            int k = (int)m % 5;
+            if(k==0) {
+                 a1[0]=0.5; a1[1]=-1; a1[2]=0.5; //算子，核
+            }
+            if (k == 1)
+            {
+                a1[0] = 0.3; a1[1] = -2; a1[2] = 0.3; //算子，核
+            }
+            if (k == 2)
+            {
+                a1[0] = 0.8; a1[1] = -3; a1[2] = 0.8; //算子，核
+            }
+            if (k == 3)
+            {
+                a1[0] = 0.3; a1[1] = -0.7; a1[2] = 0.3; //算子，核
+            }
+            if (k == 4)
+            {
+                a1[0] = -1; a1[1] = 3; a1[2] = -1; //算子，核
+            }
+
+            this.Text = k.ToString();
+            for (int i = 0; i < rows; i++)
+                for (int j = 1; j < cols - 1; j++)
+                {
+                    a0[0] = dp0[i, j - 1, 0];
+                    a0[1] = dp0[i, j, 0];
+                    a0[2] = dp0[i, j + 1, 0];
+                    dp1[i,j,0]= (byte)(a0[0]*a1[0]+a0[1]*a1[1]+a0[2]*a1[2]);
+                }
+            f2.Data = dp1;
+            this.pictureBox1.Image = f2.ToBitmap();
+            m++;
+        }
+
+        //二维矩阵算子：
+        private void button36_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>();
+            Byte[, ,] dp0 = f2.Data;
+            Byte[, ,] dp1 = new byte[rows, cols, 1];
+
+            byte[,] a0 = new byte[3,3];
+
+            double[,] a1 ={ {1,-1,1},
+                            {-1, 0,-1},
+                            {1,-1,1}
+                           };
+
+            double[,] a2 ={ {1 ,0, 0 },
+                            {0, 1, 0 },
+                            {0, 0, 1 }
+                           };
+
+            double[,] a3 ={ {-1 ,0, 0 },
+                            {0, 1, 0 },
+                            {0, 0, -1 }
+                           };
+
+            double[,] a4 ={ {-1 ,0, -1 },
+                            {0, 5, 0 },
+                            {-1, 0, -1 }
+                           };
+            double[,] a5 ={ {-1 ,2, -1 },
+                            {2,  5, 2 },
+                            {-1, 2, -1 }
+                           };
+            double[,] a6 ={ {1 ,0, -1 },
+                            {1, 0, -1 },
+                            {1, 0, -1 }
+                           };
+
+            double[,] a7 ={ {1 , 0, -1 },
+                            {0,  0,0 },
+                            {-1, 0, 1 }
+                           };
+
+            double[,] a8 ={ {1 , 0, -1 },
+                            {0,  3, 0 },
+                            {-1, 0, 1 }
+                           };
+
+            double[,] a9 ={ {-0.25 , -0.25, -0.25 },
+                            {-0.25,  1, -0.25 },
+                            {-0.25 , -0.25, -0.25 }
+                           };
+            double[,] a10 ={ {-0.25 , -0.25, -0.25 },
+                            {-0.25,  0.2, -0.25 },
+                            {-0.25 , -0.25, -0.25 }
+                           };
+
+            double[,] a11 ={ {-0.15 , 0.5, -0.15 },
+                            {0.5,  0, 0.5 },
+                            {-0.15 , 0.5, -0.15 }
+                           };
+            //if (m % 11 == 0) a1 = a1;
+            if (m % 11 == 1) a1 = a11;
+            if (m % 11 == 2) a1 = a2;
+            if (m % 11 == 3) a1 = a3;
+            if (m % 11 == 4) a1 = a4;
+            if (m % 11 == 5) a1 = a5;
+            if (m % 11 == 6) a1 = a6;
+            if (m % 11 == 7) a1 = a7;
+            if (m % 11 == 8) a1 = a8;
+            if (m % 11 == 9) a1 = a9;
+            if (m % 11 == 10) a1 = a10;
+
+            for (int i = 2; i < rows-2; i++)
+                for (int j = 2; j < cols - 2; j++)
+                {
+                    a0[0,0] = dp0[i-1, j - 1, 0];
+                    a0[0,1] = dp0[i-1, j, 0];
+                    a0[0,2] = dp0[i-1, j + 1, 0];
+                    a0[1,0] = dp0[i, j - 1, 0];
+                    a0[1,1] = dp0[i, j, 0];
+                    a0[1,2] = dp0[i, j + 1, 0];
+                    a0[2,0] = dp0[i+1, j - 1, 0];
+                    a0[2,1] = dp0[i+1, j, 0];
+                    a0[2,2] = dp0[i+1, j + 1, 0];
+
+                    for (int ii = -1; ii < 2; ii++)
+                    {
+                        for (int jj = -1; jj < 2; jj++)
+                        {
+                            dp1[i , j, 0] += (byte)(a0[1+ii, 1+jj] * a1[1+jj, 1+ii] );
+                        }
+                    }
+                }
+            f2.Data = dp1;
+            this.pictureBox1.Image = f2.ToBitmap();
+            m++;
+        }
+
+        //二维旋转变换:
+        private void button38_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>();
+            Byte[, ,] dp0 = f2.Data;
+            Byte[, ,] dp1 = new byte[rows, cols, 1];
+
+            byte[,] a0 = new byte[3, 3];
+            double PI = 3.1416;
+
+            //二维旋转矩阵:
+            double[,] a1 ={ {Math.Cos(-PI/6),Math.Sin(-PI/6)},
+                            {-Math.Sin(-PI/6),Math.Cos(-PI/6)}                            
+                           };
+            //二维旋转变换:
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    int x = (int)(rows / 2 + (i - rows / 2) * a1[0, 0] + (j - cols / 2) * a1[0, 1]);
+                    int y = (int)(cols / 2 + (i - rows / 2) * a1[1, 0] + (j - cols / 2) * a1[1, 1]); 
+                    if(x>0 && y>0 && x<rows && y<cols){
+                        dp1[x,y,0]=dp0[i,j,0];
+                    }
+                }
+            f2.Data = dp1;
+            this.pictureBox1.Image = f2.ToBitmap();  
+        }
+
+        //缩放矩阵
+        private void button37_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>();
+            Byte[, ,] dp0 = f2.Data;
+            Byte[, ,] dp1 = new byte[rows, cols, 1];
+
+            byte[,] a0 = new byte[3, 3];
+            double PI = 3.1416;
+            ////放大矩阵:
+            //double[,] a1 ={ {1.5,0},
+            //                {0,1.5}                            
+            //               };
+            //缩小:
+            double[,] a1 ={ {0.55,0},
+                            {0,0.55}                            
+                           };
+
+            //放大变换:
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    int x = (int)(rows / 2 + (i - rows / 2) * a1[0, 0] + (j - cols / 2) * a1[0, 1]);
+                    int y = (int)(cols / 2 + (i - rows / 2) * a1[1, 0] + (j - cols / 2) * a1[1, 1]);
+                    if (x > 0 && y > 0 && x < rows && y < cols)
+                    {
+                        dp1[x, y, 0] = dp0[i, j, 0];
+                    }
+                }
+            f2.Data = dp1;
+            this.pictureBox1.Image = f2.ToBitmap(); 
+        }
+
+        //八塔项氏变换
+        private void button40_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>();
+            Byte[, ,] dp0 = f2.Data;
+            Byte[, ,] dp1 = new byte[rows, cols, 1];
+
+            byte[,] a0 = new byte[3, 3];
+            double PI = 3.1416;
+
+            //变换:
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+
+                    double[,] a1 ={ {1.6-Math.Cos(1.57*i/rows) ,0.1},
+                                    {0.1,1.6-Math.Sin(1.57*j/rows)}                            
+                           };      
+                    int x = (int)(rows / 2 + (i - rows / 2) * a1[0, 0] + (j - cols / 2) * a1[0, 1]);
+                    int y = (int)(cols / 2 + (i - rows / 2) * a1[1, 0] + (j - cols / 2) * a1[1, 1]);
+                    if (x > 0 && y > 0 && x < rows && y < cols)
+                    {
+                        dp1[x, y, 0] = dp0[i, j, 0];
+                    }
+                }
+            f2.Data = dp1;
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //八塔农园变换:
+        private void button39_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>();
+            Byte[, ,] dp0 = f2.Data;
+            Byte[, ,] dp1 = new byte[rows, cols, 1];
+
+            byte[,] a0 = new byte[3, 3];
+            double PI = 3.1416;
+
+            //变换:
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                //变形A:
+                    double[,] a1 ={ {0.56+Math.Sin(1.17*i/cols) ,0},
+                                    {0,0.56+Math.Sin(1.17*i/cols)}                            
+                           };
+                //变形B:
+                    double[,] a2 ={ {1.95-(double)i/rows ,0},
+                                    {0,1.95-(double)j/cols}                            
+                           };
+                //透视:
+                    double[,] a3 ={ {4-(double)rows/(i+1) ,0},
+                                    {0,4-(double)cols/(i+1)}                            
+                           };
+
+                //透视倒影:
+                    double[,] a4 ={ {0.5-(double)rows/(i+1) ,0},
+                                    {0,0.5-(double)cols/(i+1)}                            
+                           };
+                //变形C:
+                    double[,] a5 ={ {1.6-(double)(j+1)/rows ,0},
+                                    {0,1.6-(double)(j+1)/cols}                            
+                           };
+                    //横向透视:
+                    double[,] a6={ {1.56-Math.Cos(1.6*j/cols) ,0},
+                                    {0,0.56+Math.Sin(1.6*j/cols)}                            
+                           };
+
+                    if (m % 6 == 1) a1 = a2;
+                    if (m % 6 == 2) a1 = a3;
+                    if (m % 6 == 3) a1 = a4;
+                    if (m % 6 == 4) a1 = a5;
+                    if (m % 6 == 5) a1 = a6;
+
+
+                    int x = (int)(rows / 2 + (i - rows / 2) * a1[0, 0] + (j - cols / 2) * a1[0, 1]);
+                    int y = (int)(cols / 2 + (i - rows / 2) * a1[1, 0] + (j - cols / 2) * a1[1, 1]);
+                    if (x > 0 && y > 0 && x < rows && y < cols)
+                    {
+                        dp1[x, y, 0] = dp0[i, j, 0];
+                    }
+                }
+            f2.Data = dp1;
+            this.pictureBox1.Image = f2.ToBitmap();
+            m++;
+        }       
+
+        //===============================  C#2010+EMGU2.3.0(openCV2.3.1) =================================
+        //===============================  By daode1212       2015-03-31 =================================
+    }
+}
