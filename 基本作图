@@ -1,0 +1,78 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+//============以下引用必须==============
+using Emgu.CV;       //PS:调用的Emgu dll
+using Emgu.CV.Structure;
+using Emgu.Util;
+using System.Threading;
+
+namespace dd00
+{
+    public partial class Form1 : Form
+    {
+        public Form1()
+        {
+           InitializeComponent();
+           
+           //用名称创建新CV窗体:
+           string title = "win1";
+           CvInvoke.cvNamedWindow(title);
+           
+           //设定长度,宽度,背景色:
+           Image<Bgr, Byte> img = new Image<Bgr, byte>(400, 300, new Bgr(225, 220, 220));
+
+            //生成点集:
+            Point[] pts=new Point[5] ;
+            pts[0].X = 10; pts[0].Y = 10;
+            pts[1].X = 50; pts[1].Y = 10;
+            pts[2].X = 70; pts[2].Y = 50;
+            pts[3].X = 10; pts[3].Y = 70;
+            pts[4].X = 10; pts[4].Y = 170;
+
+           //画四个点:
+           for (int i = 0; i < 4; i++)
+           {
+               img.Draw(new CircleF(pts[i], 3), new Bgr(0, 0, 100), 5);               
+           }
+
+            //画直线:
+           img.Draw(new LineSegment2D(pts[0], pts[4]), new Bgr(0, 50, 50), 5);
+           
+           //画十字线:
+           img.Draw(new Cross2DF(new PointF(200, 100), 100, 80), new Bgr(255, 0, 255), 5); //画圆:
+
+            //画矩形:
+           img.Draw(new Rectangle(250,120,60,40), new Bgr(255, 0, 255), 5); 
+           
+            //画多边形:           
+           img.FillConvexPoly(pts, new Bgr(255, 0, 0));
+
+           //画圆:
+           img.Draw(new CircleF(new PointF(200, 150), 100), new Bgr(255, 0, 255), 2);
+
+           //画椭圆:
+           img.Draw(new Ellipse(new PointF(300, 200), new Size(120, 100), 90), new Bgr(0, 255, 0), 2); 
+            
+
+           //设置字体,输出文字:
+           MCvFont f = new MCvFont(Emgu.CV.CvEnum.FONT.CV_FONT_HERSHEY_COMPLEX, 1, 1);          
+           img.Draw("Hello, world", ref f, new Point(80, 100), new Bgr(0, 55, 0));
+           
+           //另存为新图片:
+           img.Save("N:/2.jpg");
+           CvInvoke.cvShowImage(title, img.Ptr);
+           
+           //击键盘后退出CV窗体: 
+           CvInvoke.cvWaitKey(0);
+           CvInvoke.cvDestroyWindow(title);
+           
+        }
+       
+    }
+}
