@@ -1,0 +1,504 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+ //===========调用的Emgu dll============
+using Emgu.CV;  
+using Emgu.CV.Structure;
+using Emgu.Util;
+using System.Threading;
+
+namespace xx
+{
+    public partial class Form1 : Form
+    {
+        private Capture capture;
+        private bool captureinprocess;   //判断摄像头的状态        
+        Image<Bgr, Byte> frame;
+        int rows;
+        int cols;
+        Dictionary<long, byte> d0;
+        Dictionary<long, byte> d1;
+        Dictionary<long, byte> d2;
+
+
+        public Form1()
+        {
+            InitializeComponent();
+        }
+
+        private void processfram(object sender, EventArgs arg)
+        {
+            //获取摄像头的视频帧:
+            frame = capture.QueryFrame();
+            imageBox1.Image = frame;            
+
+
+
+
+            //Image<Bgr, Byte> frame = capture.QueryFrame();//获取摄像头的视频帧
+            //Image<Bgr, Byte> frame2 = frame.Convert<Bgr, Byte>(); //将帧转换为RGB类型，对应为三维数组
+            //Image<Gray, Byte> grayFrame = frame.Convert<Gray, Byte>();//将帧转换为Gray类型，对应为一维数组
+            //Image<Ycc, Byte> currentYCrCbFrame = frame.Convert<Ycc, Byte>();//将帧转换为YCbCr类型，对应为三维数组
+            //Image<Gray, Byte> skin = new Image<Gray, Byte>(frame.Width, frame.Height);//构建灰度区域对象
+
+            
+
+           //======???======
+            //IntPtr Dyncontour = new IntPtr();//存放检测到的图像块的首地址
+            //IntPtr Dynstorage = CvInvoke.cvCreateMemStorage(0);//开辟内存区域
+            //Image<Bgr, Byte> f3 = frame.Convert<Bgr, Byte>();
+            //Seq<rsidint> DyncontourTemp = new Seq<rsidint>(Dyncontour, null);//方便对IntPtr类型进行操作
+            //for (; DyncontourTemp != null && DyncontourTemp.Ptr.ToInt32() != 0; DyncontourTemp = DyncontourTemp.HNext)
+            //{
+            //    CvInvoke.cvDrawContours(f3, DyncontourTemp, new MCvScalar(0, 0, 0), new MCvScalar(255, 255, 0), 0, 1, Emgu.CV.CvEnum.LINE_TYPE.EIGHT_CONNECTED, new rsidint(cols/2, rows/2));
+            //}
+            //this.pictureBox1.Image = f3.ToBitmap();
+
+        }
+
+      
+
+        //反色抓拍：
+        private void button2_Click(object sender, EventArgs e)
+        {
+            //========反色处理==========
+            Image<Bgr, Byte> img3 = frame.Convert<byte>(delegate(Byte b) { return (Byte)(255 - b); });
+            this.pictureBox1.Image = img3.ToBitmap();
+            //==============
+        }
+
+        //画面加图：
+        private void button3_Click(object sender, EventArgs e)
+        {
+            //rsidintF pf = new rsidintF(cols / 2, rows / 2);
+            //Bgr c0 = new Bgr(255, 0, 255);
+            //frame.Draw(new CircleF(pf, 25), c0, 1);
+            //this.pictureBox1.Image = frame.ToBitmap();
+        }
+
+        //取出点之像素:
+        private void button4_Click(object sender, EventArgs e)
+        {
+            //在圆心处取出像素的RGB：
+            cols = frame.Width;
+            rows = frame.Height;
+
+            //将帧转换为BGR类型，对应为三维数组:
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            string c0 = f2[cols / 2, rows / 2].Red + "," + f2[cols / 2, rows / 2].Green + "," + f2[cols / 2, rows / 2].Blue;
+            MessageBox.Show(c0);
+        }
+
+        //灰度照片
+        private void button5_Click(object sender, EventArgs e)
+        {
+            Image<Gray, Byte> f2 = frame.Convert<Gray, Byte>(); ;//构建灰度区域对象            
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //二值化图像:
+        private void button6_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+            int rows = frame.Rows;
+            int cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = bgrData[i, j, 0];
+                    g = bgrData[i, j, 1];
+                    r = bgrData[i, j, 2];
+                    if (b < 110) //阀值
+                    {
+                        bgrData[i, j, 0] = (byte)0;
+                        bgrData[i, j, 1] = (byte)0;
+                        bgrData[i, j, 2] = (byte)0;
+                    }
+                    else      //二值化:
+                    {
+                        bgrData[i, j, 0] = (byte)255;
+                        bgrData[i, j, 1] = (byte)255;
+                        bgrData[i, j, 2] = (byte)255;
+                    }
+                }
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //水平翻转：
+        private void button7_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.Image = f2.Flip(Emgu.CV.CvEnum.FLIP.HORIZONTAL).ToBitmap(); 
+        }
+
+        //垂直翻转：
+        private void button8_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            this.pictureBox1.Image = f2.Flip(Emgu.CV.CvEnum.FLIP.VERTICAL).ToBitmap(); 
+        }
+
+        //保存视频为图片文件:
+        private void button9_Click(object sender, EventArgs e)
+        {
+            CvInvoke.cvSaveImage("../../1.jpg", frame);
+            MessageBox.Show("文件已经保存： ../../1.jpg");
+        }
+
+        //摄像头控制：
+        private void button1_Click_1(object sender, EventArgs e)
+        {
+            if (capture != null)//摄像头不为空
+            {
+                if (captureinprocess)
+                {
+                    Application.Idle -= new EventHandler(processfram);
+                    this.Text = "摄像头已经停止";
+                    button1.Text = "开始摄像";
+                }
+                else
+                {
+                    Application.Idle += new EventHandler(processfram);
+                    this.Text = "摄像头已经启动";
+                    button1.Text = "停止摄像";
+                }
+                captureinprocess = !captureinprocess;
+            }
+            else    //摄像头为空则通过Capture()方法调用
+            {
+                try
+                {
+                    capture = new Capture();
+                }
+                catch (NullReferenceException excpt)
+                {
+                    MessageBox.Show(excpt.Message);
+                }
+            }
+        }
+
+        //窗体加载：
+        private void Form1_Load_1(object sender, EventArgs e)
+        {
+            //建立字典对象：
+            d0 = new Dictionary<long, byte>();
+            d1 = new Dictionary<long, byte>();
+            d2 = new Dictionary<long, byte>();
+            
+            if (capture != null)//摄像头不为空
+            {
+                if (captureinprocess)
+                {
+                    Application.Idle -= new EventHandler(processfram);
+                    this.Text = "摄像头已经停止";
+                    button1.Text = "开始摄像";
+                }
+                else
+                {
+                    Application.Idle += new EventHandler(processfram);
+                    this.Text = "摄像头已经启动";
+                    button1.Text = "停止摄像";
+                }
+                captureinprocess = !captureinprocess;
+            }
+            else    //摄像头为空则通过Capture()方法调用
+            {
+                try
+                {
+                    capture = new Capture();
+                }
+                catch (NullReferenceException excpt)
+                {
+                    MessageBox.Show(excpt.Message);
+                }
+            }
+        }
+
+        private void button10_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+            //转换后，在pictureBox1上显示二值化图像:
+            int r = 0;
+            int g = 0;
+            int b = 0;
+           rows = frame.Rows;
+           cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+            
+            //10*10区块平滑化：
+            byte[,] v = new byte[rows, cols]; int tmp = 0;
+            for (int i = 0; i < rows-10; i+=10)
+                for (int j = 0; j < cols-10; j+=10)
+                {
+                    //计算均值：
+                    for (int x = 0; x < 11; x ++)
+                    {
+                        for (int y = 0; y <11; y ++)
+                        {
+                          tmp+= bgrData[i+x, j+y, 0];
+                        }
+                    }
+                    //写入均值：
+                    for (int x = 0; x < 11; x++)
+                    {
+                        for (int y = 0; y < 11; y++)
+                        {
+                            v[i + x, j + y] = (byte)(tmp / 100);
+                        }
+                    }                    
+                    tmp = 0; //临时值清零
+                }
+
+            //区域平滑后，二值化：
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                {
+                    b = v[i , j ]; 
+                    if (b < 110) //阀值
+                    {
+                        bgrData[i, j, 0] = (byte)0;
+                        bgrData[i, j, 1] = (byte)0;
+                        bgrData[i, j, 2] = (byte)0;
+                    }
+                    else      //二值化:
+                    {
+                        bgrData[i, j, 0] = (byte)255;
+                        bgrData[i, j, 1] = (byte)255;
+                        bgrData[i, j, 2] = (byte)255;
+                    }
+                }
+
+
+            
+            //二值化之后，异或运算边界化：
+            for (int i = 0; i < rows-1; i++)
+                for (int j = 0; j < cols-1; j++)
+                {                    
+                   int b1 = bgrData[i+1, j, 0];  
+                   int b2 = bgrData[i, j+1, 0];
+                       b = bgrData[i, j, 0];
+                   int bb=(b ^ b1)|(b ^ b2 );  //异或运算
+                   bgrData[i, j, 0] = (byte)bb;
+                   bgrData[i, j, 1] = (byte)bb;
+                   bgrData[i, j, 2] = (byte)bb;
+                    //白色点加入到字典：
+                   if(bb==255)d0.Add(i*cols+j,0); //
+                }
+            this.pictureBox1.Image = f2.ToBitmap();
+        }
+
+        //边界矢量化：
+        private void button11_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("当前字典0含有点："+d0.Count.ToString());
+            
+            //给定起始点,调用搜索函数：
+            int x = 10;
+            int y = 10;
+            refind(x,y);
+
+            //画矢量线：
+            MessageBox.Show("当前字典1含有点：" + d1.Count.ToString());
+
+        }
+
+        //保存右图：
+        private void button12_Click(object sender, EventArgs e)
+        {
+            this.pictureBox1.Image.Save("../../2.jpg");
+            MessageBox.Show("文件已经保存： ../../2.jpg");
+        }
+
+        private void refind(int x0, int y0)
+        {
+            
+
+        }
+
+        //统计与命名:
+        private void button13_Click(object sender, EventArgs e)
+        {
+            Image<Bgr, Byte> f2 = frame.Convert<Bgr, Byte>();
+
+            //转换后，在pictureBox1上显示二值化图像:
+            rows = frame.Rows;
+            cols = frame.Cols;
+            Byte[, ,] bgrData = f2.Data;
+
+            double cnt = 0;//总数,面积
+            double xo = 0, yo = 0;//中心
+            double rin = 0;//平均值,方差
+            string s = "";//报告文字
+
+            //二值化：同时统计:总点数(面积),X总和,Y总和
+            for (int i = 50; i < rows - 50; i++)
+                for (int j = 50; j < cols - 80; j++)
+                {
+                    if (bgrData[i, j, 0] < 200) //阀值
+                    {
+                        bgrData[i, j, 0] = (byte)0;
+                        bgrData[i, j, 1] = (byte)0;
+                        bgrData[i, j, 2] = (byte)0;
+                        cnt++;
+                        xo += j; yo += i;
+                    }
+                    else
+                    {
+                        bgrData[i, j, 0] = (byte)255;
+                        bgrData[i, j, 1] = (byte)255;
+                        bgrData[i, j, 2] = (byte)255;
+                    }
+                }
+
+            if (cnt >= 1)
+            { //求出对象中点
+                xo = xo / cnt; yo = yo / cnt;
+            }
+
+
+            //画中心:
+            bgrData[(int)yo - 1, (int)xo - 1, 2] = 255;
+            bgrData[(int)yo - 1, (int)xo + 1, 2] = 255;
+            bgrData[(int)yo + 1, (int)xo - 1, 2] = 255;
+            bgrData[(int)yo + 1, (int)xo + 1, 2] = 255;
+
+            this.pictureBox1.Image = f2.ToBitmap();
+
+
+            //计算内质半经:
+            double[,] r=new double[rows,cols]; 
+            for (int i = 50; i < rows - 50; i++)  //y
+                for (int j = 50; j < cols - 80; j++) //x
+                {
+                    if (bgrData[i, j, 0] < 120) //阀值
+                    {
+                        r[i,j]= Math.Sqrt((j - xo) * (j - xo) + (i - yo) * (i - yo));
+                        rin += r[i,j];
+                    }
+                }
+            rin /= cnt;//内质半经
+            //计算内质离散性:
+            double rinm = 0;
+            foreach(double w in r){
+                rinm += (w - rin) * (w - rin);
+            }
+            rinm = Math.Sqrt(rinm)/cnt;
+
+            //二值化之后，异或运算边界化：
+            for (int i = 50; i < rows - 50; i++)
+                for (int j = 50; j < cols - 80; j++)
+                {
+                    byte b1 = bgrData[i + 1, j, 0];
+                    byte b2 = bgrData[i, j + 1, 0];
+                    byte b3 = bgrData[i + 1, j + 1, 0];
+                    byte bi = bgrData[i, j, 0];
+                    int bb = (bi ^ b1) | (bi ^ b2)|(b1^b2);  //异或运算
+                    bgrData[i, j, 0] = (byte)bb;
+                    bgrData[i, j, 1] = (byte)bb;
+                    bgrData[i, j, 2] = (byte)bb;
+                    //白色点加入到字典：
+                    //if (bb == 255) d0.Add(i * cols + j, 0); //
+                }
+
+            //统计轮廓半经:
+            double rsid = 0; double[,] r2 = new double[rows, cols]; 
+            for (int i = 50; i < rows - 50; i++)  //y
+                for (int j = 50; j < cols - 80; j++) //x
+                {
+                    if (bgrData[i, j, 0] == 255) 
+                    {
+                        r2[i,j]= Math.Sqrt((j - xo) * (j - xo) + (i - yo) * (i - yo));
+                        rsid += r2[i, j];
+                    }
+                }
+            rsid /= cnt;//轮廓半经
+
+            //计算轮廓离散性:
+            double rsdm = 0;
+            foreach (double w in r2)
+            {
+                rsdm += (w - rsid) * (w - rsid);
+            }
+            rsdm = Math.Sqrt(rsdm) / cnt;
+
+            //计算内质峰谷性:
+            double[] wm = new double[370];
+            double[] wk = new double[370];
+            for (int i = 50; i < rows - 50; i++)  //y
+                for (int j = 50; j < cols - 80; j++) //x
+                {
+                    if (r[i, j]>0)//bgrData[i, j, 0] == 255
+                    {                       
+                       int k=(int)Math.Round(10*180*Math.Atan2(i-yo,j-xo)/3.1415926);
+                       k /= 10;
+                       wm[k + 180] += r[i,j];
+                       wk[k + 180] += 1;
+                    }
+                }
+
+            //统计凹凸:
+            int hi = 0;
+            int lo = 0;
+            
+            for (int k = 0; k <= 360; k += 10)
+            {                
+                 wm[k]=(int)(wm[k]/ wk[k]);                 
+            }
+
+            string tmp = "";
+            for (int k = 10; k <= 360-10;k += 10 )
+            {                 
+                if (wm[k] - wm[k - 10]>0 && wm[k] - wm[k + 10]>0)
+                {
+                    hi++;
+                    tmp = ">";
+                }
+                if (wm[k] - wm[k - 10]<0 && wm[k] - wm[k + 10]<0)
+                {
+                    lo++;
+                    tmp = "<";
+                }
+                s += k.ToString() + ":" + wm[k].ToString() + StringRepeat("|", (int)wm[k]) +tmp+ " \n";
+                tmp = "";
+            }
+
+            s += "\n   面积比:" + (cnt / Math.Sqrt(rows * cols)).ToString();
+            s += "\n   内质半经:" + (rin ).ToString();
+            s += "\n   内质离散:" + (100*rinm).ToString();
+            s += "\n   轮廓半经:" + (rsid ).ToString();
+            s += "\n   轮廓离散:" + (100*rsdm).ToString();
+            s += "\n   凸峰数:" + hi.ToString();
+            s += "\n   凹谷数:" + lo.ToString();
+            MessageBox.Show(s);
+
+        }
+
+        /// <param name="str">字符串</param>
+        /// <param name="n">重复次数</param>
+        public static string StringRepeat(string str, int n)
+        {
+            if (String.IsNullOrEmpty(str) || n <= 0)
+                return str;
+            StringBuilder sb = new StringBuilder();
+            while (n > 0)
+            {
+                sb.Append(str);
+                n--;
+            }
+            return sb.ToString();
+        } 
+
+    //=============================================    
+    }
+}
